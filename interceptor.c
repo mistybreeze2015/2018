@@ -406,6 +406,10 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		
 		table[syscall].intercepted = 0;
 		
+		table[syscall].monitored = 0;
+		
+		table[syscall].listcount = 0;
+		
 		spin_unlock(&my_table_lock);
 		
 		spin_lock(&sys_call_table_lock);
