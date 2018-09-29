@@ -292,7 +292,7 @@ asmlinkage long interceptor(struct pt_regs reg) {
 		if (check_pid_monitored(reg.ax, current->pid) == 1){
 		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);}
 		}
-	else if ((table[reg.ax].monitored == 2){
+	else if (table[reg.ax].monitored == 2){
 		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);
 	}
 	
@@ -507,7 +507,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		//syscall monitored; stop it
 		else{
 			del_pid_sysc(pid, syscall);
-			spin_unlock(sys_call_table_lock);
+			spin_unlock(&sys_call_table_lock);
 		}
 
 		return 0;
@@ -543,6 +543,8 @@ long (*orig_custom_syscall)(void);
  */
 static int init_function(void) {
 	
+	int i = 0;
+	
 	//init sys_call_table
 	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
 	orig_exit_group = sys_call_table[__NR_exit_group];
@@ -563,7 +565,7 @@ static int init_function(void) {
 	//init my_table
 	spin_lock(&my_table_lock);
 
-	int i = 0;
+	
 	for(i = 0; i < NR_syscalls; i++){
 		table[i].intercepted = 0;
 		table[i].monitored = 0;
@@ -588,7 +590,7 @@ static int init_function(void) {
  */
 static void exit_function(void)
 {        
-   
+    int i = 0;
 	
 	//release sys_call_table
 	spin_lock(&sys_call_table_lock);
@@ -604,7 +606,7 @@ static void exit_function(void)
 	
 	//release my_table
     spin_lock(&my_table_lock);  
-	int i = 0;
+	
 	for(i = 0; i < NR_syscalls; i++){	   
 			//release syscall
             my_syscall(REQUEST_SYSCALL_RELEASE, i, i);	 
