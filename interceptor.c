@@ -461,6 +461,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 
 
  	else if(cmd == REQUEST_STOP_MONITORING){
+		int s;
 		
 		//check valid syscall
 		if((syscall < 0) || (syscall > NR_syscalls - 1) || (syscall == MY_CUSTOM_SYSCALL)){
@@ -488,7 +489,19 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		if(table[syscall].intercepted == 0){
 			return -EINVAL;
 		}
+        
+		if (pid == 0){
+			
+		spin_lock(&my_table_lock);
+        //Stop monitor all pids
 
+		  table[syscall].monitored = 0;
+		  table[syscall].listcount = 0;
+		  destroy_list(syscall);
+
+		spin_unlock(&my_table_lock); }
+		else {
+		
 		spin_lock(&sys_call_table_lock);
 		//syscall not monitored
 		if(check_pid_monitored(syscall, pid) == 0){
@@ -499,7 +512,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 			del_pid_sysc(pid, syscall);
 			spin_unlock(&sys_call_table_lock);
 		}
-
+	   }
 		return 0;
  	}
     else{
