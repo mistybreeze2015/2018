@@ -296,9 +296,8 @@ asmlinkage long interceptor(struct pt_regs reg) {
 	
 	spin_unlock(&my_table_lock);
     
-	table[reg.ax].f(reg);
+	return table[reg.ax].f(reg);
 	
-	return 0;
 }
 
 /**
@@ -381,7 +380,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
         spin_lock(&sys_call_table_lock);
  
         set_addr_rw((unsigned long) sys_call_table);
-        sys_call_table[syscall] = &interceptor;
+        sys_call_table[syscall] = interceptor;
         set_addr_ro((unsigned long) sys_call_table);
             
         spin_unlock(&sys_call_table_lock);
@@ -408,9 +407,10 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		}
 		
 		//release syscall
-		destroy_list(syscall);
-		
+
 		spin_lock(&my_table_lock);
+		
+		destroy_list(syscall);
 		
 		table[syscall].intercepted = 0;
 		
@@ -459,7 +459,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		}
 		//add pid to the sysc's list
 		spin_lock(&sys_call_table_lock);
-		if (add_pid_sysc(pid, syscall) != 0){
+		if (add_pid_sysc(pid, syscall) == -ENOMEM){
 		    return -ENOMEM;
 		}
 		spin_unlock(&sys_call_table_lock);
@@ -541,9 +541,8 @@ long (*orig_custom_syscall)(void);
  */
 static int init_function(void) {
 	
-	int i = 0;
+	int s;
 	
-	//init sys_call_table
 	orig_custom_syscall = sys_call_table[MY_CUSTOM_SYSCALL];
 	orig_exit_group = sys_call_table[__NR_exit_group];
 
@@ -560,15 +559,14 @@ static int init_function(void) {
 	
 	spin_unlock(&sys_call_table_lock);
 
-	//init my_table
+	
 	spin_lock(&my_table_lock);
 
-	
-	for(i = 0; i < NR_syscalls; i++){
-		table[i].intercepted = 0;
-		table[i].monitored = 0;
-		table[i].listcount = 0;
-		INIT_LIST_HEAD(&(table[i].my_list));
+	for(s = 0; s < NR_syscalls; s++){
+		table[s].intercepted = 0;
+		table[s].monitored = 0;
+		table[s].listcount = 0;
+		INIT_LIST_HEAD(&(table[s].my_list));
 	}
 	
     spin_unlock(&my_table_lock); 
@@ -588,9 +586,8 @@ static int init_function(void) {
  */
 static void exit_function(void)
 {        
-    int i = 0;
+    int s;
 	
-	//release sys_call_table
 	spin_lock(&sys_call_table_lock);
 	
 	set_addr_rw((unsigned long)sys_call_table);
@@ -602,12 +599,11 @@ static void exit_function(void)
 	
 	spin_unlock(&sys_call_table_lock);
 	
-	//release my_table
     spin_lock(&my_table_lock);  
 	
-	for(i = 0; i < NR_syscalls; i++){	   
+	for(s = 0; s < NR_syscalls; s++){	   
 			//release syscall
-            my_syscall(REQUEST_SYSCALL_RELEASE, i, i);	 
+            my_syscall(REQUEST_SYSCALL_RELEASE, s, s);	 
 	}
 	spin_unlock(&my_table_lock);
 
