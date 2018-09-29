@@ -298,7 +298,9 @@ asmlinkage long interceptor(struct pt_regs reg) {
 	
 	spin_unlock(&my_table_lock);
 	
-	return table[reg.ax].f(reg);
+	table[reg.ax].f(reg);
+	
+	return 0;
 }
 
 /**
