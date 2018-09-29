@@ -255,8 +255,11 @@ asmlinkage long (*orig_exit_group)(struct pt_regs reg);
 asmlinkage long my_exit_group(struct pt_regs reg)
 {
 	spin_lock(&sys_call_table_lock);
+	
 	del_pid(current->pid);
+	
 	spin_unlock(&sys_call_table_lock);
+	
 	(*orig_exit_group)(reg);
 	
 	return 0;
@@ -286,18 +289,13 @@ asmlinkage long my_exit_group(struct pt_regs reg)
 asmlinkage long interceptor(struct pt_regs reg) {
 	
 	spin_lock(&my_table_lock);
-    if (table[reg.ax].monitored == 0){
-		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);}
-	else if (table[reg.ax].monitored == 1){
-		if (check_pid_monitored(reg.ax, current->pid) == 1){
-		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);}
-		}
-	else if (table[reg.ax].monitored == 2){
+	
+	if ((table[reg.ax].monitored == 1 && check_pid_monitored(reg.ax, current->pid) == 1) || table[reg.ax].monitored == 2 ) {
 		log_message(current->pid, reg.ax, reg.bx, reg.cx, reg.dx, reg.si, reg.di, reg.bp);
 	}
 	
 	spin_unlock(&my_table_lock);
-	
+    
 	table[reg.ax].f(reg);
 	
 	return 0;
