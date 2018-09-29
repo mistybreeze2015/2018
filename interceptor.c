@@ -254,17 +254,9 @@ asmlinkage long (*orig_exit_group)(struct pt_regs reg);
  */
 asmlinkage long my_exit_group(struct pt_regs reg)
 {
-	spin_lock(&sys_call_table_lock);
-	
 	del_pid(current->pid);
 	
-	spin_unlock(&sys_call_table_lock);
-	
-	(*orig_exit_group)(reg);
-	
-	return 0;
-
-
+	return (*orig_exit_group)(reg);
 }
 //----------------------------------------------------------------
 
@@ -437,21 +429,21 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		//check valid pid
 		if((pid < 0)){
 			return -EINVAL;}
-		else if (pid != 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
+		else if (pid > 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
 			return -EINVAL;
 		}
  	
         //caller has to be root
 	    if(current_uid() != 0){
 			
+ 			if(check_pids_same_owner(current->pid, pid) == -EPERM){
+				return -EPERM;
+			}
+			
 			if(pid == 0){
  				return -EPERM;
  			}
-			//access denied for pid 0; no need to check its owner
 
- 			if(check_pids_same_owner(current->pid, pid) != 0){
-				return -EPERM;
-			}
 		}
 		//pid monitored;no need to add
 		if(check_pid_monitored(syscall, pid) == 1){
@@ -476,19 +468,19 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		//check valid pid
 		if((pid < 0)){
 			return -EINVAL;}
-		else if (pid != 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
+		else if (pid > 0 && pid_task(find_vpid(pid), PIDTYPE_PID) == NULL){
 			return -EINVAL;
 		}
  		
 	    if(current_uid() != 0){
 			
+ 			if(check_pids_same_owner(current->pid, pid) == -EPERM){
+				return -EPERM;
+			}
+			
 			if(pid == 0){
  				return -EPERM;
  			}
-			//access denied for pid 0; no need to check its owner.
- 			if( check_pids_same_owner(current->pid, pid) != 0){
-				return -EPERM;
-			}
 
 		}
 
@@ -511,6 +503,7 @@ asmlinkage long my_syscall(int cmd, int syscall, int pid) {
 		return 0;
  	}
     else{
+	//syscall does not match custom syscall name
  	return -EINVAL;
 	}
 
@@ -602,8 +595,8 @@ static void exit_function(void)
     spin_lock(&my_table_lock);  
 	
 	for(s = 0; s < NR_syscalls; s++){	   
-			//release syscall
-            my_syscall(REQUEST_SYSCALL_RELEASE, s, s);	 
+		//release syscall
+        my_syscall(REQUEST_SYSCALL_RELEASE, s, s);	 
 	}
 	spin_unlock(&my_table_lock);
 
